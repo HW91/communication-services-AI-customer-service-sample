@@ -1,0 +1,21 @@
+name: customer-service-app
+
+metadata:
+  template: communication-services-AI-customer-service-sample@0.0.1-beta
+
+services:
+  web:
+    project: ./app/frontend
+    dist: build
+    language: js
+    host: appservice
+
+  api:
+    project: ./app/backend
+    language: csharp
+    host: appservice
+
+infra:
+  provider: bicep
+  path: infra
+  module: main

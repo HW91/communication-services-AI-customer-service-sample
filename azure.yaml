@@ -1,0 +1,77 @@
+# azure.yaml
+name: Communication Services AI Customer Service Sample Pipeline
+
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  AZURE_SUBSCRIPTION: '<Your-Azure-Subscription-ID>'
+  RESOURCE_GROUP: '<Your-Resource-Group>'
+  LOCATION: '<Your-Location>'
+  COSMOS_DB_ACCOUNT: '<Your-CosmosDB-Account-Name>'
+  STORAGE_ACCOUNT: '<Your-Storage-Account-Name>'
+  FUNCTION_APP: '<Your-Function-App-Name>'
+  LANGUAGE_RESOURCE: '<Your-AI-Language-Resource>'
+  SPEECH_RESOURCE: '<Your-AI-Speech-Resource>'
+  COMMUNICATION_RESOURCE: '<Your-Communication-Resource>'
+  OPENAI_RESOURCE: '<Your-Azure-OpenAI-Resource>'
+  KEY_VAULT: '<Your-Key-Vault-Name>'
+
+jobs:
+  - job: Deploy_Resources
+    displayName: 'Deploy Azure Resources'
+    steps:
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: '3.x'
+      
+      - task: AzureCLI@2
+        inputs:
+          azureSubscription: '$(AZURE_SUBSCRIPTION)'
+          scriptType: 'bash'
+          scriptLocation: 'inlineScript'
+          inlineScript: |
+            # Log in to Azure
+            az account set --subscription $(AZURE_SUBSCRIPTION)
+
+            # Deploy ARM template for required resources
+            az deployment group create \
+              --name "Deployment-$(date +%s)" \
+              --resource-group $(RESOURCE_GROUP) \
+              --template-file infrastructure/mainTemplate.json \
+              --parameters cosmosDbAccount=$(COSMOS_DB_ACCOUNT) \
+                           storageAccount=$(STORAGE_ACCOUNT) \
+                           functionApp=$(FUNCTION_APP) \
+                           languageResource=$(LANGUAGE_RESOURCE) \
+                           speechResource=$(SPEECH_RESOURCE) \
+                           communicationResource=$(COMMUNICATION_RESOURCE) \
+                           openAIResource=$(OPENAI_RESOURCE) \
+                           keyVault=$(KEY_VAULT)
+
+  - job: Run_Application
+    displayName: 'Run Application'
+    dependsOn: Deploy_Resources
+    steps:
+      - checkout: self
+
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: '3.x'
+
+      - task: PipAuthenticate@1
+
+      - script: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+        displayName: 'Install dependencies'
+
+      - script: |
+          source .venv/bin/activate
+          python run_app.py
+        displayName: 'Start Application'
